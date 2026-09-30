@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1450">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Арканоид</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1: #e0e7ff; --bg2: #fbc2eb; --bg3: #a6f0ff;
+    --panel: rgba(255,255,255,0.62);
+    --text: #1d1b3a;
+    --muted: #6a6792;
+    --field1: #fbfbff; --field2: #e9ecff;
+    --grid: rgba(123, 97, 255, 0.10);
+    --accent1: #ff3d9a; --accent2: #6a4bff; --accent3: #00c2e0;
+    --glow: rgba(106, 75, 255, 0.35);
+    --overlay: rgba(248,248,255,0.86);
+    --gap: 16px;
+  }
+  body.dark {
+    --bg1: #07061a; --bg2: #1b1450; --bg3: #0a2a3d;
+    --panel: rgba(14,12,40,0.7);
+    --text: #eef0ff;
+    --muted: #9c98d6;
+    --field1: #0a0820; --field2: #16113d;
+    --grid: rgba(0, 229, 255, 0.09);
+    --accent1: #ff2fd0; --accent2: #7c5cff; --accent3: #00e5ff;
+    --glow: rgba(0, 229, 255, 0.45);
+    --overlay: rgba(7,6,24,0.88);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: "Unbounded", "Segoe UI", system-ui, sans-serif;
+    font-weight: 400;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 10% -10%, var(--bg2), transparent 60%),
+      radial-gradient(900px 600px at 110% 110%, var(--bg3), transparent 60%),
+      var(--bg1);
+    background-attachment: fixed;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(var(--gap), env(safe-area-inset-top)) max(var(--gap), env(safe-area-inset-right)) var(--gap) max(var(--gap), env(safe-area-inset-left));
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 {
+    margin: 0 0 12px; font-size: 34px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; line-height: 1.1;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2), var(--accent3));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 14px var(--glow));
+  }
+  h1 small { display: block; font-size: 10px; letter-spacing: 8px; font-weight: 300; text-align: center; -webkit-text-fill-color: var(--muted); }
+  .wrap { display: flex; gap: var(--gap); align-items: flex-start; justify-content: center; width: 100%; }
+  .game-col { display: flex; flex-direction: column; align-items: center; }
+
+  /* Футуристичные рамки со срезанными углами */
+  .frame {
+    --cut: 14px;
+    padding: 1.5px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2) 50%, var(--accent3));
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+    filter: drop-shadow(0 0 12px var(--glow));
+  }
+  .frame > .inner {
+    background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+    height: 100%;
+  }
+  .hud-frame { width: 100%; margin-bottom: 12px; }
+  .hud { display: flex; align-items: stretch; }
+  .stat { flex: 1; min-width: 0; padding: 10px 16px; border-right: 1px solid var(--grid); white-space: nowrap; }
+  .stat label { display: block; font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .stat b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hud .tools { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+
+  .stage { position: relative; touch-action: none; }
+  .stage .inner { position: relative; }
+  canvas { display: block; }
+  .corner { position: absolute; width: 22px; height: 22px; border: 2px solid var(--accent3); pointer-events: none; z-index: 3; filter: drop-shadow(0 0 6px var(--accent3)); }
+  .corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
+  .corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
+  .scan { position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,0.035) 3px 4px); }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 1;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 20px; overflow: auto;
+    background: var(--overlay); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 { font-size: 32px; font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2), var(--accent3));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .overlay p { margin: 6px 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .overlay .big { font-size: 20px; color: var(--text); font-weight: 600; }
+  .btn {
+    font-family: inherit; border: none; cursor: pointer; font-weight: 600; font-size: 12px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: #fff; padding: 11px 20px; margin: 6px;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2));
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: filter .15s, transform .1s;
+    touch-action: manipulation;
+  }
+  .btn:hover { filter: brightness(1.15) drop-shadow(0 0 8px var(--glow)); transform: translateY(-1px); }
+  .btn.ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent2); font-size: 10px; padding: 9px 14px; margin: 0; }
+  .btn.icon { min-width: 40px; min-height: 36px; padding: 6px 10px; font-size: 14px; letter-spacing: 0;
+    clip-path: none; border-radius: 8px; box-shadow: none; border: 1.5px solid var(--accent2); }
+
+  .side { width: 270px; flex: none; }
+  .side .inner { padding: 18px; }
+  .side section { min-width: 0; }
+  .side h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--accent2); }
+  body.dark .side h3 { color: var(--accent3); }
+  .side ol { margin: 0 0 18px; padding-left: 22px; font-size: 13px; }
+  .side li { margin: 5px 0; }
+  .side li small { color: var(--muted); font-size: 10px; }
+  .keys { font-size: 11px; color: var(--muted); line-height: 2; margin-bottom: 16px; }
+  .bonus-list { list-style: none; padding: 0; margin: 0 0 16px; font-size: 11px; color: var(--muted); }
+  .bonus-list li { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+  .pill { flex: none; width: 38px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9px; color: #fff; font-size: 11px; font-weight: 800; }
+  kbd {
+    font-family: inherit; display: inline-block; padding: 0 7px; font-size: 10px; line-height: 18px;
+    border: 1px solid var(--accent2); color: var(--text); border-radius: 3px;
+  }
+  .trophy { font-size: 76px; animation: bounce 1.2s infinite; filter: drop-shadow(0 0 20px gold); }
+  @keyframes bounce { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+  #confetti { position: absolute; inset: 0; pointer-events: none; z-index: 4; width: 100%; height: 100%; }
+
+  /* подсказки: клавиатура vs сенсор */
+  .touch-only { display: none; }
+  body.touch .touch-only { display: initial; }
+  body.touch .kbd-only { display: none; }
+
+  /* ---- планшеты и узкие экраны: панель уходит под поле ---- */
+  @media (max-width: 1099px) {
+    .wrap { flex-direction: column; align-items: center; }
+    .side { width: 100%; }
+    .side .inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 24px; }
+  }
+  /* ---- телефоны ---- */
+  @media (max-width: 600px) {
+    :root { --gap: 8px; }
+    h1 { font-size: 22px; letter-spacing: 4px; margin-bottom: 8px; }
+    h1 small { font-size: 8px; letter-spacing: 6px; }
+    .frame { --cut: 10px; }
+    .stat { padding: 7px 10px; }
+    .stat label { font-size: 7px; letter-spacing: 2px; }
+    .stat b { font-size: 16px; }
+    .hud .tools { padding: 0 8px; }
+    .hud-frame { margin-bottom: 8px; }
+    .overlay h2 { font-size: 20px; }
+    .overlay p { font-size: 11px; }
+    .overlay .big { font-size: 15px; }
+    .trophy { font-size: 52px; }
+    .btn { font-size: 10px; padding: 9px 14px; }
+    .side .inner { padding: 14px; }
+  }
+  /* ---- телефон в альбомной ориентации: экономим высоту ---- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    :root { --gap: 6px; }
+    h1 { display: none; }
+    .hud-frame { margin-bottom: 6px; }
+    .stat { padding: 4px 10px; }
+    .stat label { display: none; }
+    .stat b { font-size: 15px; }
+    .overlay h2 { font-size: 18px; margin-bottom: 4px; }
+    .overlay p { font-size: 10px; margin: 2px 0; }
+    .overlay .big { font-size: 13px; }
+    .trophy { font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+  <h1>Арканоид<small>NEON · EDITION</small></h1>
+  <div class="wrap">
+    <div class="game-col" id="gameCol">
+      <div class="frame hud-frame" id="hudFrame"><div class="inner hud">
+        <div class="stat"><label>Счёт</label><b id="score">0</b></div>
+        <div class="stat"><label>Уровень</label><b id="level">1</b><b style="opacity:.4">/3</b></div>
+        <div class="stat"><label>Рекорд</label><b id="best">0</b></div>
+        <div class="tools">
+          <button class="btn ghost icon" id="pauseBtn" title="Пауза">⏸</button>
+          <button class="btn ghost icon" id="themeBtn" title="Сменить тему">🌙</button>
+        </div>
+      </div></div>
+      <div class="frame stage" id="stage"><div class="inner">
+        <canvas id="game"></canvas>
+        <div class="overlay" id="overlay"></div>
+        <canvas id="confetti"></canvas>
+        <div class="scan"></div>
+        <span class="corner tr"></span><span class="corner bl"></span>
+      </div></div>
+    </div>
+    <aside class="frame side"><div class="inner">
+      <section>
+        <h3>🏆 Рекорды</h3>
+        <ol id="records"></ol>
+      </section>
+      <section>
+        <h3>Бонусы</h3>
+        <ul class="bonus-list" id="bonusList"></ul>
+        <h3>⚡ Скорость</h3>
+        <p class="keys" style="line-height:1.7">Каждые 8 разбитых кирпичей мячик ускоряется на 6% — это видно по делениям ⚡ на поле. Максимум +30%, на новом уровне скорость сбрасывается.</p>
+      </section>
+      <section>
+        <h3>Управление</h3>
+        <div class="keys kbd-only">
+          <kbd>←</kbd> <kbd>→</kbd> или мышь — платформа<br>
+          <kbd>Пробел</kbd> или клик — запуск мячика<br>
+          <kbd>P</kbd> пауза · <kbd>R</kbd> рестарт<br>
+          <kbd>T</kbd> сменить тему
+        </div>
+        <div class="keys touch-only">
+          👆 Веди пальцем по полю — платформа едет следом<br>
+          👆 Тап по полю — запуск мячика<br>
+          ⏸ — пауза, 🌙 — тема
+        </div>
+        <button class="btn" id="restartBtn">↻ Рестарт</button>
+      </section>
+    </div></aside>
+  </div>
+
+<script>
+(() => {
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const ccv = document.getElementById('confetti');
+  const cc = ccv.getContext('2d');
+  const stage = document.getElementById('stage');
+  const gameCol = document.getElementById('gameCol');
+  const hudFrame = document.getElementById('hudFrame');
+  // Логическая ширина поля всегда 800; высота подстраивается под пропорции экрана
+  const W = 800;
+  let H = 600;
+  let viewScale = 1;   // css-пикселей на 1 логический пиксель
+  let ui = 1;          // увеличение мелких элементов на маленьких экранах
+  const FONT = '"Unbounded", "Segoe UI", sans-serif';
+  const overlay = document.getElementById('overlay');
+  const $score = document.getElementById('score');
+  const $level = document.getElementById('level');
+  const $best = document.getElementById('best');
+  const $records = document.getElementById('records');
+  const themeBtn = document.getElementById('themeBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  document.body.classList.toggle('touch', isTouch);
+
+  // ---------- storage (safe) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+  let records = store.get('breakout_records', []);
+
+  // ---------- theme ----------
+  let colors = {};
+  function readColors() {
+    const s = getComputedStyle(document.body);
+    ['--field1','--field2','--grid','--accent1','--accent2','--accent3','--text','--muted'].forEach(k => colors[k] = s.getPropertyValue(k).trim());
+    colors.dark = document.body.classList.contains('dark');
+  }
+  function setTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    themeBtn.textContent = dark ? '☀️' : '🌙';
+    store.set('breakout_dark', dark);
+    readColors();
+  }
+  themeBtn.addEventListener('click', () => { setTheme(!document.body.classList.contains('dark')); themeBtn.blur(); });
+  setTheme(store.get('breakout_dark', false));
+
+  // ---------- бонусы ----------
+  const FPS = 60;
+  const BONUS = {
+    multi:  { icon: '×3', name: 'Мультибол — +2 мячика',               c: ['#00e5ff', '#0077ff'] },
+    fire:   { icon: '🔥', name: 'Огненный шар — пробивает кирпичи, 7 с', c: ['#ffb300', '#ff3d00'], dur: 7 },
+    wide:   { icon: '↔',  name: 'Широкая платформа, 12 с',              c: ['#7cff6b', '#00b86b'], dur: 12 },
+    slow:   { icon: '⏳', name: 'Замедление мячиков, 10 с',              c: ['#c77dff', '#7b2cbf'], dur: 10 },
+    shield: { icon: '🛡', name: 'Щит — спасёт мячик один раз',           c: ['#ff5ec4', '#ff2a68'], dur: 20 },
+  };
+  const BONUS_KEYS = Object.keys(BONUS);
+  const DROP_CHANCE = 0.12;      // ~1 бонус на 8 кирпичей
+  const MAX_FALLING = 1;         // одновременно падает не больше одного
+  document.getElementById('bonusList').innerHTML = BONUS_KEYS.map(k =>
+    `<li><span class="pill" style="background:linear-gradient(90deg,${BONUS[k].c[0]},${BONUS[k].c[1]})">${BONUS[k].icon}</span>${BONUS[k].name}</li>`).join('');
+
+  // ---------- levels ----------
+  // 1..3 — прочность кирпича, 0 — пусто, # — неразрушимое препятствие
+  const LEVELS = [
+    { name: 'Разминка', speed: 5, paddleW: 130,
+      map: ['1111111111','1111111111','1111111111','1111111111'] },
+    { name: 'Крепость', speed: 6, paddleW: 115,
+      map: ['2222222222','2111111112','2122222212','2111111112','1111001111','1111001111'] },
+    { name: 'Лабиринт', speed: 7, paddleW: 100,
+      map: ['3333333333','3222222223','2211111122','1#11221#11','1122332211','0#022220#0','0000000000','00##00##00'],
+      movers: true },
+  ];
+  const COLS = 10, BW = 70, BH = 24, GAP = 6;
+  const OFFX = (W - (COLS * BW + (COLS - 1) * GAP)) / 2, OFFY = 70;
+  const PALETTE = [
+    ['#ff5ea8','#ff9a8b'], ['#8a5cff','#d67bff'], ['#00d4c8','#68f0a8'],
+    ['#ffb347','#ff5ea8'], ['#3fa9ff','#00e5ff'], ['#ffd166','#ff8c42'],
+    ['#5b8cff','#a78bfa'], ['#ff7eb3','#8a5cff'],
+  ];
+  const HARD = { 2: ['#4f46e5','#7c3aed'], 3: ['#e11d48','#9d174d'] };
+
+  // ---------- state ----------
+  let state, score, levelIdx, bricks = [], obstacles = [], balls = [], paddle, basePaddleW;
+  let particles = [], drops = [], effects = {}, keys = {}, tick = 0;
+  const floats = [];
+
+  // ---------- скорость мячика: понятные ступени вместо случайных изменений ----------
+  // Каждые 8 разбитых кирпичей скорость растёт на одну ступень (+6%), максимум 5 ступеней (+30%).
+  // На новом уровне скорость сбрасывается. Модуль скорости всегда одинаковый у всех мячиков.
+  const SPEED_STEP = 0.06, BRICKS_PER_STEP = 8, MAX_TIER = 5;
+  const MIN_ANGLE = 0.35;     // мячик не летит почти горизонтально (~20° минимум)
+  let speedTier = 0, bricksBroken = 0;
+  const speedMul = () => 1 + SPEED_STEP * speedTier;
+  const curSpeed = () => LEVELS[levelIdx].speed * speedMul();
+  function normalize(ball) {
+    let vx = ball.vx, vy = ball.vy;
+    const m = Math.hypot(vx, vy) || 1;
+    vx /= m; vy /= m;
+    const minSin = Math.sin(MIN_ANGLE);
+    if (Math.abs(vy) < minSin) {
+      vy = (vy < 0 ? -1 : 1) * minSin;
+      vx = (vx < 0 ? -1 : 1) * Math.cos(MIN_ANGLE);
+    }
+    const sp = curSpeed();
+    ball.vx = vx * sp; ball.vy = vy * sp;
+  }
+
+  const ballR = () => Math.round(9 * Math.min(ui, 1.7));
+  function makeBall(x, y, vx, vy) { return { r: ballR(), x, y, vx, vy, trail: [] }; }
+
+  function buildLevel(i) {
+    const L = LEVELS[i];
+    bricks = []; obstacles = []; drops = []; effects = {}; particles = []; floats.length = 0;
+    speedTier = 0; bricksBroken = 0;
+    L.map.forEach((row, r) => {
+      [...row].forEach((ch, c) => {
+        const x = OFFX + c * (BW + GAP), y = OFFY + r * (BH + GAP);
+        if (ch === '#') obstacles.push({ x, y, w: BW, h: BH });
+        else if (ch !== '0') {
+          const hp = +ch;
+          bricks.push({ x, y, w: BW, h: BH, hp, maxHp: hp, pal: hp > 1 ? HARD[hp] : PALETTE[r % PALETTE.length] });
+        }
+      });
+    });
+    if (L.movers) {
+      // высота подвижных балок задаётся долей поля, чтобы работать при любой высоте
+      obstacles.push({ x: 120, fy: 0.6,  y: 0, w: 120, h: 16, vx: 2.2, minX: 30, maxX: 360, moving: true });
+      obstacles.push({ x: 560, fy: 0.68, y: 0, w: 120, h: 16, vx: -2.6, minX: 440, maxX: 770, moving: true });
+    }
+    basePaddleW = L.paddleW;
+    paddle = { w: L.paddleW, h: 14, x: W / 2 - L.paddleW / 2, y: 0, speed: 9 };
+    balls = [makeBall(W / 2, 0, 0, 0)];
+    placeByHeight();
+    $level.textContent = i + 1;
+  }
+
+  // пересчёт того, что зависит от высоты поля и размера экрана
+  function placeByHeight() {
+    if (!paddle) return;
+    paddle.h = Math.round(14 * Math.min(ui, 1.5));
+    paddle.y = H - 26 - paddle.h - (ui - 1) * 14;
+    obstacles.forEach(o => { if (o.fy) o.y = Math.round(H * o.fy); });
+    balls.forEach(b => { b.r = ballR(); if (b.y > H) b.y = H - 60; });
+    if (state === 'ready' && balls[0]) { balls[0].x = paddle.x + paddle.w / 2; balls[0].y = paddle.y - balls[0].r - 1; }
+  }
+
+  // ---------- адаптивный размер ----------
+  function layout() {
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    const cs = getComputedStyle(document.body);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const sideBySide = vw >= 1100;
+    const h1 = document.querySelector('h1');
+    const h1H = h1.offsetParent ? h1.offsetHeight + parseFloat(getComputedStyle(h1).marginBottom) : 0;
+    const hudH = hudFrame.offsetHeight + parseFloat(getComputedStyle(hudFrame).marginBottom);
+
+    let availW = vw - padX - (sideBySide ? 270 + parseFloat(cs.getPropertyValue('--gap')) : 0);
+    let availH = vh - padY - h1H - hudH - 4;
+    availW = Math.min(availW, 1000);
+    availH = Math.max(availH, 220);
+
+    // высота поля в логических единицах: от 520 (телефон в альбоме) до 1000 (вертикальный телефон)
+    const newH = Math.round(Math.max(520, Math.min(1000, W * availH / availW)));
+    const scale = Math.min(availW / W, availH / newH);
+    const cssW = Math.floor(W * scale), cssH = Math.floor(newH * scale);
+
+    H = newH; viewScale = cssW / W;
+    ui = Math.max(1, Math.min(2.2, 0.8 / viewScale));   // на маленьких экранах крупнее мячик, шрифт, бонусы
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    [cv, ccv].forEach(c => {
+      c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
+      c.style.width = cssW + 'px'; c.style.height = cssH + 'px';
+    });
+    ctx.setTransform(c2l(dpr), 0, 0, c2l(dpr), 0, 0);
+    cc.setTransform(c2l(dpr), 0, 0, c2l(dpr), 0, 0);
+    stage.style.width = (cssW + 3) + 'px';
+    gameCol.style.width = (cssW + 3) + 'px';
+    placeByHeight();
+  }
+  const c2l = dpr => viewScale * dpr;
+
+  let resizeT;
+  function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 80); }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 250));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+
+  // ---------- game flow ----------
+  const tapWord = () => isTouch ? 'Тапни по полю' : 'Нажми <kbd>Пробел</kbd>';
+
+  function newGame() {
+    score = 0; levelIdx = 0;
+    state = 'ready';
+    buildLevel(0);
+    stopConfetti();
+    updateHud();
+    showOverlay(`<h2>Уровень 1 · ${LEVELS[0].name}</h2>
+      <p>Разбей все кирпичи и не дай мячику упасть.<br>Из кирпичей иногда выпадают бонусы — лови их платформой!</p>
+      ${isTouch ? '<p>Веди пальцем по полю, чтобы двигать платформу.</p>' : ''}
+      <p class="big">${tapWord()}, чтобы начать</p>`);
+  }
+
+  function updateHud() {
+    $score.textContent = score;
+    $best.textContent = Math.max(score, records[0]?.score || 0);
+    pauseBtn.textContent = state === 'paused' ? '▶' : '⏸';
+  }
+
+  function renderRecords() {
+    $records.innerHTML = records.length
+      ? records.map(r => `<li><b>${r.score}</b> <small>· ур. ${r.level}${r.win ? ' 🏆' : ''} · ${r.date}</small></li>`).join('')
+      : '<li><small>пока пусто — стань первым!</small></li>';
+  }
+
+  function saveRecord(win) {
+    if (score <= 0) return false;
+    const date = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+    const prevBest = records[0]?.score || 0;
+    records.push({ score, level: levelIdx + 1, win, date });
+    records.sort((a, b) => b.score - a.score);
+    records = records.slice(0, 5);
+    store.set('breakout_records', records);
+    renderRecords(); updateHud();
+    return score > prevBest;
+  }
+
+  function showOverlay(html) { overlay.innerHTML = html; overlay.classList.add('show'); }
+  function hideOverlay() { overlay.classList.remove('show'); }
+
+  function launch() {
+    const sp = curSpeed();
+    const ang = (-Math.PI / 2) + (Math.random() * 0.6 - 0.3);
+    balls[0].vx = Math.cos(ang) * sp; balls[0].vy = Math.sin(ang) * sp;
+    state = 'playing'; hideOverlay(); updateHud();
+  }
+
+  // главное «действие» — пробел или тап
+  function primaryAction() {
+    if (state === 'ready') launch();
+    else if (state === 'levelDone') nextLevel();
+    else if (state === 'over' || state === 'win') newGame();
+    else if (state === 'paused') togglePause();
+  }
+
+  // ---------- клавиатура ----------
+  document.addEventListener('keydown', e => {
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+    const k = e.key.toLowerCase();
+    if (e.code === 'Space') { if (state !== 'paused') primaryAction(); }
+    else if (k === 'r' || k === 'к') newGame();
+    else if (k === 'p' || k === 'з') togglePause();
+    else if (k === 't' || k === 'е') setTheme(!document.body.classList.contains('dark'));
+  });
+  document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+  // ---------- сенсор и мышь ----------
+  // Платформа следует за пальцем по горизонтали (относительное перемещение —
+  // палец может быть где угодно на поле и не закрывает платформу).
+  let drag = null;
+  const toLogicalX = clientX => (clientX - cv.getBoundingClientRect().left) / viewScale;
+
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    drag = { id: e.pointerId, lastX: toLogicalX(e.clientX), startX: e.clientX, startY: e.clientY, moved: 0, t: performance.now() };
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+  });
+  stage.addEventListener('pointermove', e => {
+    const x = toLogicalX(e.clientX);
+    if (drag && drag.id === e.pointerId) {
+      const dx = x - drag.lastX;
+      drag.lastX = x;
+      drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY));
+      if (state === 'playing' || state === 'ready') movePaddleBy(dx * (e.pointerType === 'mouse' ? 1 : 1.25));
+    } else if (e.pointerType === 'mouse' && (state === 'playing' || state === 'ready')) {
+      // мышь без нажатия: платформа под курсором
+      paddle.x = x - paddle.w / 2; clampPaddle();
+    }
+  });
+  function endDrag(e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    const isTap = drag.moved < 10 && performance.now() - drag.t < 350;
+    drag = null;
+    if (isTap && !e.target.closest('button')) primaryAction();
+  }
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', () => { drag = null; });
+
+  function movePaddleBy(dx) { paddle.x += dx; clampPaddle(); }
+  function clampPaddle() { paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x)); }
+
+  document.getElementById('restartBtn').addEventListener('click', e => { e.currentTarget.blur(); newGame(); });
+  pauseBtn.addEventListener('click', () => { pauseBtn.blur(); if (state === 'ready') return; togglePause(); });
+  overlay.addEventListener('click', e => {
+    const a = e.target.dataset.act;
+    if (a === 'restart') newGame();
+    if (a === 'next') nextLevel();
+  });
+
+  // авто-пауза, если свернули вкладку или пришёл звонок
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') togglePause(); });
+  window.addEventListener('blur', () => { if (state === 'playing') togglePause(); });
+
+  function togglePause() {
+    if (state === 'playing') {
+      state = 'paused';
+      showOverlay(`<h2>Пауза</h2><p>${isTouch ? 'Тапни по полю' : 'Нажми <kbd>P</kbd>'}, чтобы продолжить</p>`);
+    } else if (state === 'paused') { state = 'playing'; hideOverlay(); }
+    updateHud();
+  }
+
+  function nextLevel() {
+    levelIdx++;
+    state = 'ready';
+    buildLevel(levelIdx);
+    showOverlay(`<h2>Уровень ${levelIdx + 1} · ${LEVELS[levelIdx].name}</h2>
+      ${levelIdx === 2 ? '<p>Осторожно: серые блоки неразрушимы, а некоторые ещё и двигаются!</p>' : '<p>Тёмные кирпичи нужно бить несколько раз.</p>'}
+      <p class="big">${tapWord()}, чтобы запустить мячик</p>`);
+  }
+
+  // ---------- бонусы: логика ----------
+  function maybeDrop(b) {
+    if (drops.length >= MAX_FALLING || Math.random() > DROP_CHANCE) return;
+    let pool = BONUS_KEYS;
+    if (balls.length >= 5) pool = pool.filter(k => k !== 'multi');
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    spawnDrop(type, b.x + b.w / 2, b.y + b.h / 2);
+  }
+  function spawnDrop(type, x, y) {
+    drops.push({ type, x, y, w: 46 * Math.min(ui, 1.8), h: 20 * Math.min(ui, 1.8), vy: 2.4 * (H / 600) ** 0.5 });
+  }
+
+  function applyBonus(type) {
+    const def = BONUS[type];
+    if (type === 'multi') {
+      const src = balls[0];
+      const sp = curSpeed();
+      [-0.5, 0.5].forEach(d => {
+        const a = Math.atan2(src.vy, src.vx) + d;
+        let vy = Math.sin(a) * sp; if (vy > -1.5) vy = -Math.abs(sp * 0.7);
+        balls.push(makeBall(src.x, src.y, Math.cos(a) * sp, vy));
+      });
+    } else {
+      effects[type] = def.dur * FPS;
+      if (type === 'wide') {
+        const c = paddle.x + paddle.w / 2;
+        paddle.w = Math.round(basePaddleW * 1.55);
+        paddle.x = c - paddle.w / 2; clampPaddle();
+      }
+    }
+    score += 25; updateHud();
+    floatText(def.icon + ' ' + def.name.split(' —')[0].split(',')[0], paddle.x + paddle.w / 2, paddle.y - 20 * ui, def.c[0]);
+  }
+
+  function expireEffect(type) {
+    delete effects[type];
+    if (type === 'wide') {
+      const c = paddle.x + paddle.w / 2;
+      paddle.w = basePaddleW;
+      paddle.x = c - paddle.w / 2; clampPaddle();
+    }
+  }
+
+  function floatText(text, x, y, col) { floats.push({ text, x, y: y - floats.length * 18 * ui, col, life: 70 }); }
+
+  // ---------- physics ----------
+  function circleRect(b, r) {
+    const cx = Math.max(r.x, Math.min(b.x, r.x + r.w));
+    const cy = Math.max(r.y, Math.min(b.y, r.y + r.h));
+    const dx = b.x - cx, dy = b.y - cy;
+    return dx * dx + dy * dy <= b.r * b.r;
+  }
+  function bounceOff(ball, r) {
+    const oL = (ball.x + ball.r) - r.x, oR = (r.x + r.w) - (ball.x - ball.r);
+    const oT = (ball.y + ball.r) - r.y, oB = (r.y + r.h) - (ball.y - ball.r);
+    const m = Math.min(oL, oR, oT, oB);
+    if (m === oL) { ball.x = r.x - ball.r; ball.vx = -Math.abs(ball.vx); }
+    else if (m === oR) { ball.x = r.x + r.w + ball.r; ball.vx = Math.abs(ball.vx); }
+    else if (m === oT) { ball.y = r.y - ball.r; ball.vy = -Math.abs(ball.vy); }
+    else { ball.y = r.y + r.h + ball.r; ball.vy = Math.abs(ball.vy); }
+  }
+
+  function spawnParticles(x, y, col, n = 12) {
+    for (let i = 0; i < n; i++)
+      particles.push({ x, y, vx: (Math.random() - .5) * 6, vy: (Math.random() - .5) * 6, life: 30, col });
+  }
+
+  function destroyBrick(i) {
+    const b = bricks[i];
+    score += 10 * b.maxHp * (levelIdx + 1);
+    spawnParticles(b.x + b.w / 2, b.y + b.h / 2, b.pal[0]);
+    bricks.splice(i, 1);
+    maybeDrop(b);
+    bricksBroken++;
+    if (bricksBroken % BRICKS_PER_STEP === 0 && speedTier < MAX_TIER && bricks.length > 0) {
+      speedTier++;
+      speedFlash = 60;
+      floatText(`⚡ Скорость ×${speedMul().toFixed(2)}`, W / 2, H * 0.5, '#ffb300');
+    }
+  }
+  let speedFlash = 0, shieldFlash = 0;
+  const shieldH = () => Math.round(16 * Math.min(ui, 1.8));
+
+  function update() {
+    tick++;
+    if (speedFlash > 0) speedFlash--;
+    if (shieldFlash > 0) shieldFlash--;
+    if (keys['ArrowLeft']) paddle.x -= paddle.speed;
+    if (keys['ArrowRight']) paddle.x += paddle.speed;
+    clampPaddle();
+
+    obstacles.forEach(o => {
+      if (!o.moving) return;
+      o.x += o.vx;
+      if (o.x < o.minX || o.x + o.w > o.maxX) o.vx *= -1;
+    });
+
+    if (state === 'ready') {
+      const b = balls[0];
+      b.x = paddle.x + paddle.w / 2; b.y = paddle.y - b.r - 1;
+    }
+
+    if (state === 'playing') {
+      for (const k in effects) if (--effects[k] <= 0) expireEffect(k);
+
+      const factor = effects.slow ? 0.6 : 1;
+      const fire = !!effects.fire;
+      const steps = 4;
+
+      for (let bi = balls.length - 1; bi >= 0; bi--) {
+        const ball = balls[bi];
+        ball.trail.push({ x: ball.x, y: ball.y }); if (ball.trail.length > 8) ball.trail.shift();
+        let lost = false;
+        for (let s = 0; s < steps; s++) {
+          ball.x += ball.vx * factor / steps; ball.y += ball.vy * factor / steps;
+
+          if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); }
+          if (ball.x + ball.r > W) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx); }
+          if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); }
+
+          if (ball.vy > 0 && circleRect(ball, paddle)) {
+            const hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+            const ang = Math.max(-1, Math.min(1, hit)) * (Math.PI / 3);
+            const sp = Math.hypot(ball.vx, ball.vy);
+            ball.vx = sp * Math.sin(ang); ball.vy = -sp * Math.cos(ang);
+            ball.y = paddle.y - ball.r;
+          }
+
+          for (const o of obstacles) if (circleRect(ball, o)) { bounceOff(ball, o); break; }
+
+          for (let i = 0; i < bricks.length; i++) {
+            const b = bricks[i];
+            if (!circleRect(ball, b)) continue;
+            if (fire) {
+              spawnParticles(b.x + b.w / 2, b.y + b.h / 2, '#ff7a00', 8);
+              destroyBrick(i); i--;
+            } else {
+              bounceOff(ball, b);
+              b.hp--;
+              if (b.hp <= 0) destroyBrick(i);
+              else score += 5;
+              break;
+            }
+          }
+          normalize(ball);   // скорость всегда ровно текущая ступень, угол не слишком пологий
+
+          const shieldY = H - shieldH();
+          if (effects.shield && ball.vy > 0 && ball.y + ball.r >= shieldY) {
+            ball.y = shieldY - ball.r; ball.vy = -Math.abs(ball.vy);
+            spawnParticles(ball.x, shieldY, '#ff5ec4', 24);
+            shieldFlash = 20;
+            expireEffect('shield');
+          }
+          if (ball.y - ball.r > H) { lost = true; break; }
+        }
+        if (lost) balls.splice(bi, 1);
+      }
+      updateHud();
+
+      for (let i = drops.length - 1; i >= 0; i--) {
+        const d = drops[i];
+        d.y += d.vy;
+        const r = { x: d.x - d.w / 2, y: d.y - d.h / 2, w: d.w, h: d.h };
+        if (r.x < paddle.x + paddle.w && r.x + r.w > paddle.x && r.y + r.h > paddle.y && r.y < paddle.y + paddle.h) {
+          applyBonus(d.type);
+          spawnParticles(d.x, paddle.y, BONUS[d.type].c[0], 18);
+          drops.splice(i, 1);
+        } else if (d.y - d.h > H) drops.splice(i, 1);
+      }
+
+      if (bricks.length === 0) levelComplete();
+      else if (balls.length === 0) gameOver();
+    }
+
+    particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--; });
+    particles = particles.filter(p => p.life > 0);
+    floats.forEach(f => { f.y -= 0.7; f.life--; });
+    for (let i = floats.length - 1; i >= 0; i--) if (floats[i].life <= 0) floats.splice(i, 1);
+  }
+
+  function levelComplete() {
+    if (levelIdx === LEVELS.length - 1) return victory();
+    state = 'levelDone';
+    score += 100 * (levelIdx + 1); updateHud();
+    showOverlay(`<h2>Уровень ${levelIdx + 1} пройден!</h2>
+      <p>Бонус за уровень: +${100 * (levelIdx + 1)}</p>
+      <p class="big">Счёт: ${score}</p>
+      <p><button class="btn" data-act="next">Дальше →</button></p>
+      <p class="kbd-only">или нажми <kbd>Пробел</kbd></p>`);
+  }
+
+  function gameOver() {
+    state = 'over';
+    const isBest = saveRecord(false);
+    showOverlay(`<h2>Game Over</h2>
+      <p>Мячик улетел вниз на уровне ${levelIdx + 1}</p>
+      <p class="big">Счёт: ${score}</p>
+      ${isBest ? '<p class="big">🎉 Новый рекорд!</p>' : ''}
+      <p><button class="btn" data-act="restart">↻ Играть снова</button></p>
+      <p class="kbd-only"><kbd>Пробел</kbd> или <kbd>R</kbd> — рестарт</p>`);
+  }
+
+  function victory() {
+    state = 'win';
+    score += 500; updateHud();
+    const isBest = saveRecord(true);
+    showOverlay(`<div class="trophy">🏆</div>
+      <h2>Поздравляем, чемпион!</h2>
+      <p>Ты прошёл все 3 уровня арканоида!</p>
+      <p>Бонус победителя: +500</p>
+      <p class="big">Итоговый счёт: ${score}</p>
+      ${isBest ? '<p class="big">⭐ Это новый рекорд! ⭐</p>' : ''}
+      <p><button class="btn" data-act="restart">↻ Сыграть ещё раз</button></p>`);
+    startConfetti();
+  }
+
+  // ---------- drawing ----------
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function chamfer(x, y, w, h, c) {
+    ctx.beginPath();
+    ctx.moveTo(x + c, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - c);
+    ctx.lineTo(x + w - c, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + c); ctx.closePath();
+  }
+
+  function drawField() {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, colors['--field2']); bg.addColorStop(1, colors['--field1']);
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = colors['--grid']; ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    const hy = H - 130;
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    for (let i = -10; i <= 10; i++) {
+      ctx.beginPath(); ctx.moveTo(W / 2 + i * 20, hy); ctx.lineTo(W / 2 + i * 110, H); ctx.stroke();
+    }
+    for (let k = 0; k < 6; k++) {
+      const y = hy + Math.pow(k / 5, 1.8) * 130 + ((tick * 0.5) % 26) * (k / 5);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Щит: широкая энергетическая полоса с сиянием, бегущими шевронами и таймером.
+  // За 3 секунды до конца начинает мигать; при отбивании мячика — вспышка.
+  function drawShield() {
+    if (!effects.shield && shieldFlash <= 0) return;
+    const sh = shieldH(), top = H - sh;
+    if (!effects.shield) {             // вспышка после срабатывания
+      ctx.globalAlpha = shieldFlash / 20;
+      ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ff5ec4'; ctx.shadowBlur = 40;
+      ctx.fillRect(0, top, W, sh);
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      return;
+    }
+    const left = effects.shield / FPS;
+    const blink = left < 3 ? (Math.sin(tick / 3) > 0 ? 1 : 0.35) : 1;
+    const pulse = 0.75 + 0.25 * Math.sin(tick / 8);
+    ctx.save();
+    ctx.globalAlpha = blink;
+    // сияние над щитом
+    const glow = ctx.createLinearGradient(0, top - 60 * ui, 0, top);
+    glow.addColorStop(0, 'rgba(255, 94, 196, 0)'); glow.addColorStop(1, `rgba(255, 94, 196, ${0.35 * pulse})`);
+    ctx.fillStyle = glow; ctx.fillRect(0, top - 60 * ui, W, 60 * ui);
+    // основная полоса
+    const band = ctx.createLinearGradient(0, 0, W, 0);
+    band.addColorStop(0, '#ff2a68'); band.addColorStop(0.5, '#ff5ec4'); band.addColorStop(1, '#b44bff');
+    ctx.fillStyle = band; ctx.globalAlpha = blink * (0.55 + 0.25 * pulse);
+    ctx.fillRect(0, top, W, sh);
+    // бегущие шевроны
+    ctx.globalAlpha = blink * 0.55;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    const stepX = sh * 1.6, off = (tick * 1.2) % stepX;
+    ctx.beginPath(); ctx.rect(0, top, W, sh); ctx.clip();
+    for (let x = -stepX + off; x < W + stepX; x += stepX) {
+      ctx.beginPath(); ctx.moveTo(x, top + sh - 2); ctx.lineTo(x + sh * 0.5, top + 2); ctx.lineTo(x + sh, top + sh - 2); ctx.stroke();
+    }
+    ctx.restore();
+    // яркая кромка
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.fillStyle = '#ffe3f4'; ctx.shadowColor = '#ff5ec4'; ctx.shadowBlur = 22;
+    ctx.fillRect(0, top - 1, W, 3);
+    ctx.shadowBlur = 0;
+    // подпись с таймером по центру
+    ctx.font = `800 ${Math.round(sh * 0.62)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`🛡 ЩИТ · ${Math.ceil(left)}с`, W / 2, top + sh / 2 + 1);
+    ctx.restore();
+  }
+
+  function draw() {
+    drawField();
+
+    bricks.forEach(b => {
+      const g = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h);
+      g.addColorStop(0, b.pal[0]); g.addColorStop(1, b.pal[1]);
+      ctx.shadowColor = b.pal[0]; ctx.shadowBlur = colors.dark ? 12 : 6;
+      ctx.fillStyle = g; chamfer(b.x, b.y, b.w, b.h, 7); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(b.x + 8, b.y + 3, b.w - 14, 3);
+      if (b.maxHp > 1) {
+        const s = Math.min(ui, 1.6), dw = 6 * s, step = 10 * s;
+        for (let k = 0; k < b.hp; k++) {
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(b.x + b.w / 2 - (b.hp * step) / 2 + k * step + 2, b.y + b.h / 2 - s, dw, 4 * s);
+        }
+      }
+    });
+
+    obstacles.forEach(o => {
+      const g = ctx.createLinearGradient(o.x, o.y, o.x, o.y + o.h);
+      g.addColorStop(0, '#cfd8e3'); g.addColorStop(1, '#58677a');
+      ctx.fillStyle = g; chamfer(o.x, o.y, o.w, o.h, 5); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+      for (let x = o.x + 8; x < o.x + o.w - 4; x += 14) {
+        ctx.beginPath(); ctx.moveTo(x, o.y + o.h - 3); ctx.lineTo(x + 6, o.y + 3); ctx.stroke();
+      }
+    });
+
+    drawShield();
+
+    drops.forEach(d => {
+      const def = BONUS[d.type];
+      const g = ctx.createLinearGradient(d.x - d.w / 2, 0, d.x + d.w / 2, 0);
+      g.addColorStop(0, def.c[0]); g.addColorStop(1, def.c[1]);
+      ctx.shadowColor = def.c[0]; ctx.shadowBlur = 14 + 6 * Math.sin(tick / 5);
+      ctx.fillStyle = g; roundRect(d.x - d.w / 2, d.y - d.h / 2, d.w, d.h, d.h / 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(d.h * 0.6)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(def.icon, d.x, d.y + 1);
+    });
+
+    const pg = ctx.createLinearGradient(paddle.x, 0, paddle.x + paddle.w, 0);
+    pg.addColorStop(0, colors['--accent1']); pg.addColorStop(.5, colors['--accent2']); pg.addColorStop(1, colors['--accent3']);
+    ctx.shadowColor = colors['--accent3']; ctx.shadowBlur = 18;
+    ctx.fillStyle = pg; chamfer(paddle.x, paddle.y, paddle.w, paddle.h, 6); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(paddle.x + 10, paddle.y + paddle.h / 2 - 1, paddle.w - 20, 2);
+
+    const fire = !!effects.fire;
+    balls.forEach(ball => {
+      const col = fire ? '#ff6a00' : colors['--accent1'];
+      ball.trail.forEach((t, i) => {
+        ctx.globalAlpha = (i / ball.trail.length) * 0.35;
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(t.x, t.y, ball.r * (i / ball.trail.length), 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      const bgd = ctx.createRadialGradient(ball.x - 3, ball.y - 3, 1, ball.x, ball.y, ball.r);
+      bgd.addColorStop(0, fire ? '#fff3b0' : '#ffffff'); bgd.addColorStop(1, col);
+      ctx.shadowColor = col; ctx.shadowBlur = fire ? 28 : 18;
+      ctx.fillStyle = bgd; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+
+    particles.forEach(p => {
+      ctx.globalAlpha = p.life / 30; ctx.fillStyle = p.col;
+      ctx.fillRect(p.x - 2 * ui, p.y - 2 * ui, 4 * ui, 4 * ui);
+    });
+    ctx.globalAlpha = 1;
+
+    floats.forEach(f => {
+      ctx.globalAlpha = Math.min(1, f.life / 30);
+      ctx.fillStyle = f.col; ctx.font = `600 ${Math.round(13 * ui)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = f.col; ctx.shadowBlur = 10;
+      ctx.fillText(f.text, Math.max(120 * ui, Math.min(W - 120 * ui, f.x)), f.y);
+      ctx.shadowBlur = 0;
+    });
+    ctx.globalAlpha = 1;
+
+    // верхняя строка (на маленьких экранах — короче и крупнее)
+    const fs = Math.round(11 * ui);
+    ctx.fillStyle = colors['--muted']; ctx.font = `400 ${fs}px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const info = ui > 1.3
+      ? `▦ ${bricks.length}   ● ${balls.length}`
+      : `КИРПИЧЕЙ: ${bricks.length}   ◆   МЯЧИКОВ: ${balls.length}   ◆`;
+    ctx.fillText(info, 20, 34);
+
+    // индикатор скорости: ⚡ + 5 делений; деление = ступень ускорения
+    const infoW = ctx.measureText(info).width;
+    const sx = 20 + infoW + 22 * ui, sy = 34;
+    const flash = speedFlash > 0 && Math.floor(speedFlash / 6) % 2 === 0;
+    const eff = speedMul() * (effects.slow ? 0.6 : 1);
+    ctx.fillStyle = flash ? '#ffb300' : (effects.slow ? '#c77dff' : colors['--muted']);
+    ctx.fillText(`⚡×${eff.toFixed(2)}`, sx, sy);
+    const bx = sx + ctx.measureText(`⚡×${eff.toFixed(2)}`).width + 8 * ui;
+    const segW = 9 * ui, segH = 8 * ui;
+    for (let k = 0; k < MAX_TIER; k++) {
+      const on = k < speedTier;
+      ctx.fillStyle = on ? (k >= 3 ? '#ff3d00' : '#ffb300') : 'rgba(128,128,160,0.25)';
+      if (on && flash && k === speedTier - 1) ctx.fillStyle = '#ffffff';
+      ctx.fillRect(bx + k * (segW + 3), sy - segH / 2, segW, segH);
+    }
+
+    // активные эффекты (справа сверху)
+    let ex = W - 20;
+    const ph = Math.round(20 * Math.min(ui, 1.8)), pw = Math.round(58 * Math.min(ui, 1.8));
+    Object.keys(effects).forEach(k => {
+      const def = BONUS[k];
+      const x = ex - pw, y = 34 - ph / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; roundRect(x, y, pw, ph, ph / 2); ctx.fill();
+      const frac = effects[k] / (def.dur * FPS);
+      const g = ctx.createLinearGradient(x, 0, x + pw, 0);
+      g.addColorStop(0, def.c[0]); g.addColorStop(1, def.c[1]);
+      ctx.save(); roundRect(x, y, pw, ph, ph / 2); ctx.clip();
+      ctx.fillStyle = g; ctx.fillRect(x, y, pw * frac, ph); ctx.restore();
+      ctx.fillStyle = '#fff'; ctx.font = `600 ${Math.round(ph * 0.5)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${def.icon} ${Math.ceil(effects[k] / FPS)}с`, x + pw / 2, y + ph / 2 + 1);
+      ex = x - 8;
+    });
+  }
+
+  // ---------- confetti ----------
+  let confetti = [], confettiOn = false;
+  function startConfetti() {
+    confettiOn = true;
+    confetti = Array.from({ length: 160 }, () => ({
+      x: Math.random() * W, y: Math.random() * -H, s: (5 + Math.random() * 6) * ui,
+      vy: 1.5 + Math.random() * 2.5, vx: (Math.random() - .5) * 1.5, rot: Math.random() * 6,
+      col: PALETTE[Math.floor(Math.random() * PALETTE.length)][Math.floor(Math.random() * 2)]
+    }));
+  }
+  function stepConfetti() {
+    confetti.forEach(p => {
+      p.y += p.vy; p.x += p.vx; p.rot += 0.1;
+      if (p.y > H) { p.y = -10; p.x = Math.random() * W; }
+    });
+  }
+  function stopConfetti() { confettiOn = false; cc.clearRect(0, 0, W, H); }
+  function drawConfetti() {
+    if (!confettiOn) return;
+    cc.clearRect(0, 0, W, H);
+    confetti.forEach(p => {
+      cc.save(); cc.translate(p.x, p.y); cc.rotate(p.rot);
+      cc.fillStyle = p.col; cc.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); cc.restore();
+    });
+  }
+
+  // ---------- loop ----------
+  // Фиксированный шаг физики: 60 обновлений в секунду на любом экране
+  // (60 Гц, 90 Гц, 120 Гц ProMotion) и при подтормаживаниях — скорость мячика не «плавает».
+  const STEP = 1000 / 60;
+  let lastT = 0, acc = 0;
+  function loop(t) {
+    if (!lastT) lastT = t;
+    acc += Math.min(t - lastT, 100);   // после сворачивания вкладки не «догоняем» сразу секунды
+    lastT = t;
+    while (acc >= STEP) {
+      if (state !== 'paused') update();
+      if (confettiOn) stepConfetti();
+      acc -= STEP;
+    }
+    draw(); drawConfetti();
+    requestAnimationFrame(loop);
+  }
+
+  renderRecords();
+  newGame();
+  layout();
+  requestAnimationFrame(loop);
+
+  // для тестов из консоли
+  window.__game = {
+    get state() { return state; }, get bricks() { return bricks; }, get balls() { return balls; },
+    get drops() { return drops; }, get paddle() { return paddle; }, get effects() { return effects; },
+    get score() { return score; }, get H() { return H; }, get ui() { return ui; },
+    levelComplete, nextLevel, applyBonus, get speedTier() { return speedTier; },
+    breakBricks(n) { for (let k = 0; k < n && bricks.length > 1; k++) destroyBrick(0); },
+    dropBonus(type) { spawnDrop(type, paddle.x + paddle.w / 2, H / 2); },
+  };
+})();
+</script>
+</body>
+</html>
