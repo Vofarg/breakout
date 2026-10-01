@@ -328,7 +328,11 @@
   const MIN_ANGLE = 0.35;     // мячик не летит почти горизонтально (~20° минимум)
   let speedTier = 0, bricksBroken = 0;
   const speedMul = () => 1 + SPEED_STEP * speedTier;
-  const curSpeed = () => LEVELS[levelIdx].speed * speedMul();
+  // Поправка на высоту поля: на вытянутом поле (телефон, планшет) мячику лететь дальше,
+  // поэтому он летит быстрее — время полёта до кирпичей примерно как на компьютере.
+  const REF_H = 640;
+  const fieldMul = () => Math.max(1, Math.min(1.6, (H / REF_H) ** 0.8));
+  const curSpeed = () => LEVELS[levelIdx].speed * speedMul() * fieldMul();
   function normalize(ball) {
     let vx = ball.vx, vy = ball.vy;
     const m = Math.hypot(vx, vy) || 1;
@@ -398,8 +402,10 @@
     availW = Math.min(availW, 1000);
     availH = Math.max(availH, 220);
 
-    // высота поля в логических единицах: от 520 (телефон в альбоме) до 1000 (вертикальный телефон)
-    const newH = Math.round(Math.max(520, Math.min(1000, W * availH / availW)));
+    // высота поля в логических единицах: от 640 (компьютер) до 1000 (вертикальный телефон);
+    // на низких экранах (телефон в альбомной ориентации) допускаем 520, чтобы поле не было крошечным
+    const minH = availH < 450 ? 520 : 640;
+    const newH = Math.round(Math.max(minH, Math.min(1000, W * availH / availW)));
     const scale = Math.min(availW / W, availH / newH);
     const cssW = Math.floor(W * scale), cssH = Math.floor(newH * scale);
 
@@ -567,7 +573,7 @@
     spawnDrop(type, b.x + b.w / 2, b.y + b.h / 2);
   }
   function spawnDrop(type, x, y) {
-    drops.push({ type, x, y, w: 46 * Math.min(ui, 1.8), h: 20 * Math.min(ui, 1.8), vy: 2.4 * (H / 600) ** 0.5 });
+    drops.push({ type, x, y, w: 46 * Math.min(ui, 1.8), h: 20 * Math.min(ui, 1.8), vy: 2.4 * fieldMul() });
   }
 
   function applyBonus(type) {
