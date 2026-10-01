@@ -330,8 +330,9 @@
   const speedMul = () => 1 + SPEED_STEP * speedTier;
   // Поправка на высоту поля: на вытянутом поле (телефон, планшет) мячику лететь дальше,
   // поэтому он летит быстрее — время полёта до кирпичей примерно как на компьютере.
+  // Только на сенсорных устройствах; на компьютере скорость всегда базовая, при любом размере окна.
   const REF_H = 640;
-  const fieldMul = () => Math.max(1, Math.min(1.6, (H / REF_H) ** 0.8));
+  const fieldMul = () => isTouch ? Math.max(1, Math.min(1.6, (H / REF_H) ** 0.8)) : 1;
   const curSpeed = () => LEVELS[levelIdx].speed * speedMul() * fieldMul();
   function normalize(ball) {
     let vx = ball.vx, vy = ball.vy;
